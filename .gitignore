@@ -1,0 +1,28 @@
+# Binaries
+go-tagger
+go-tagger.exe
+dist/
+
+# Test artifacts
+coverage.out
+coverage.html
+*.test
+*.bench
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files created by go-tagger itself
+*.go-tagger.tmp
+
+# Added entries (2 items)
+*.exe
+*sublime*

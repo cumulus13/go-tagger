@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64,   ext: ""     }
+          - { goos: linux,   goarch: arm64,   ext: ""     }
+          - { goos: linux,   goarch: 386,     ext: ""     }
+          - { goos: linux,   goarch: arm,     ext: ""     }
+          - { goos: darwin,  goarch: amd64,   ext: ""     }
+          - { goos: darwin,  goarch: arm64,   ext: ""     }
+          - { goos: windows, goarch: amd64,   ext: ".exe" }
+          - { goos: windows, goarch: arm64,   ext: ".exe" }
+          - { goos: freebsd, goarch: amd64,   ext: ""     }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Extract version info
+        id: version
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME}"            >> $GITHUB_OUTPUT
+          echo "COMMIT=$(git rev-parse --short HEAD)"  >> $GITHUB_OUTPUT
+          echo "DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"  >> $GITHUB_OUTPUT
+
+      - name: Build
+        env:
+          GOOS:        ${{ matrix.goos }}
+          GOARCH:      ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          BINARY="go-tagger_${{ steps.version.outputs.VERSION }}_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}"
+          go build -trimpath \
+            -ldflags "-s -w \
+              -X github.com/cumulus13/go-tagger/internal/config.Version=${{ steps.version.outputs.VERSION }} \
+              -X github.com/cumulus13/go-tagger/internal/config.GitCommit=${{ steps.version.outputs.COMMIT }} \
+              -X github.com/cumulus13/go-tagger/internal/config.BuildDate=${{ steps.version.outputs.DATE }}" \
+            -o "$BINARY" \
+            ./cmd/go-tagger
+          echo "BINARY=$BINARY" >> $GITHUB_ENV
+
+      - name: Package (tar.gz for non-Windows)
+        if: matrix.goos != 'windows'
+        run: |
+          ARCHIVE="${BINARY%.}.tar.gz"
+          tar czf "$ARCHIVE" "$BINARY" README.md LICENSE
+          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+
+      - name: Package (zip for Windows)
+        if: matrix.goos == 'windows'
+        run: |
+          ARCHIVE="${BINARY%.exe}.zip"
+          zip "$ARCHIVE" "$BINARY" README.md LICENSE
+          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+          retention-days: 1
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate combined SHA256SUMS
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          echo "Contents of dist/:"
+          ls -lh
+
+      - name: Extract changelog for this tag
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Try to extract from CHANGELOG.md between this tag and the previous one
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[?${TAG//v}\]?/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md > release_notes.md
+          fi
+          if [ ! -s release_notes.md ]; then
+            echo "Release ${TAG}" > release_notes.md
+            echo "" >> release_notes.md
+            git log "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD" \
+              --pretty=format:"- %s" >> release_notes.md 2>/dev/null || echo "Initial release" >> release_notes.md
+          fi
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "go-tagger ${{ github.ref_name }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
