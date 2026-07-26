@@ -557,26 +557,32 @@ func CheckConsistency(files []string) ConsistencyReport {
 	}
 }
 
-// ── LicFace presets ───────────────────────────────────────────────────────────
+// ── Preset application ────────────────────────────────────────────────────────
 
-// ApplyLicFace fills ts with values from the named LicFace preset.
-// ts.Artist must be set before calling.
+// ApplyLicFace fills ts with values from the named preset (licface or cumulus13).
+// ts.Artist must be set before calling. year is the current year string (e.g. "2024").
+// Preset IDs 0-3 are licface; IDs 10-13 are cumulus13.
 func ApplyLicFace(ts *TagSet, presetID int, year string) {
 	p := config.Get(presetID)
 	if p == nil {
 		return
 	}
-	ts.Comment = config.Comment
-	ts.EncodedBy = config.EncodedBy
+
+	// Resolve contact strings from the preset's group
+	comment, url, publisher, encodedby := config.ContactForGroup(p.Group)
+
+	ts.Comment = comment
+	ts.EncodedBy = encodedby
 	ts.Copyright = year
+
 	if p.SetDate {
 		ts.Date = year
 	}
 	if p.SetPublisher {
-		ts.Publisher = config.Publisher
+		ts.Publisher = publisher
 	}
 	if p.SetURL {
-		ts.URL = config.URL
+		ts.URL = url
 	}
 	if p.SetOriginalArtist {
 		ts.OrigArtist = ts.Artist

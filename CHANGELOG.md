@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Emoji-rich terminal UI (fully disableable via `-nc` / `NO_COLOR`)
 - Batch processing of entire directories, with recursive mode (`-rec`)
 - Title file import — parse `NN. Title` lines from a plain text file
+- LicFace presets 0–3 for standardized metadata workflows (`-A`)
 - Cover art set from JPEG/PNG/GIF/BMP (`-C`) and extract (`-ec`)
 - Smart file rename: by tag (`-R title`) or by filename (`-R file`)
 - Dry-run/test mode (`-T`) — shows all changes without writing

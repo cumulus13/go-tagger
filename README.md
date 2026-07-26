@@ -1,6 +1,6 @@
 # 🎵 go-tagger
 
-> **MP3 ID3v2 Tag Editor** — batch-edit, rename, cover art, true-color hex output, and emoji-rich terminal UI. Zero external dependencies.
+> **Professional MP3 ID3v2 Tag Editor** — batch-edit, rename, cover art, LicFace presets, true-color hex output, and emoji-rich terminal UI. Zero external dependencies.
 
 [![CI](https://github.com/cumulus13/go-tagger/actions/workflows/ci.yml/badge.svg)](https://github.com/cumulus13/go-tagger/actions/workflows/ci.yml)
 [![Release](https://github.com/cumulus13/go-tagger/actions/workflows/release.yml/badge.svg)](https://github.com/cumulus13/go-tagger/releases)
@@ -20,6 +20,7 @@
 | 📝 **Title file import** | Provide a `.txt` list (`01. Title`, …) — track numbers and titles auto-parsed |
 | 🖼️ **Cover art** | Set from JPEG/PNG/GIF/BMP file or extract embedded art |
 | ✏️ **Smart rename** | Rename files by tag or by filename pattern |
+| 🎛️ **LicFace presets** | 4 built-in tagging presets (0–3) for standardized metadata workflows |
 | 🧪 **Dry-run mode** | Preview every change before writing with `-T` |
 | 🔒 **Atomic saves** | All writes go through a temp-file rename — no half-written files |
 | ⚡ **Zero deps** | Pure Go standard library only; no CGO, no external packages |
@@ -42,6 +43,25 @@ sudo mv go-tagger /usr/local/bin/
 curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_darwin_arm64.tar.gz | tar xz
 sudo mv go-tagger /usr/local/bin/
 ```
+
+### Android / Kali NetHunter / Termux
+
+The binary is statically linked — no libc or shared libraries needed.
+
+```bash
+# armv7 (32-bit — Kali NetHunter, most Android devices)
+curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_android_armv7.tar.gz | tar xz
+chmod +x go-tagger-android-armv7
+# Optional: move to Termux $PATH
+mv go-tagger-android-armv7 $PREFIX/bin/go-tagger
+
+# arm64 (64-bit — modern Android with Termux)
+curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_android_arm64.tar.gz | tar xz
+chmod +x go-tagger-android-arm64
+mv go-tagger-android-arm64 $PREFIX/bin/go-tagger
+```
+
+> Verified on: `Linux localhost 3.18.100-Kali-Nethunter-Kernel armv7l Android`
 
 ### Build from source
 
@@ -71,6 +91,9 @@ go-tagger song.mp3 -I
 
 # Dry-run: preview what would change
 go-tagger ./album/ -a "New Artist" -T
+
+# Apply LicFace preset 2 (full metadata normalization)
+go-tagger ./album/ -A 2
 
 # Extract embedded cover art
 go-tagger song.mp3 -ec
@@ -129,6 +152,8 @@ go-tagger ./album/ -R title
 | `-T` | **Dry-run** — show all changes without writing |
 | `-R <title\|file>` | Rename files: `title` uses tag data, `file` parses filename |
 | `-RP <pattern>` | Rename separator pattern: `-` for `NN - Title` style |
+| `-A <0-3>` | Apply a LicFace preset (see [LicFace Presets](#-licface-presets)) |
+| `-SA` | Show the LicFace preset table |
 | `-rec` | Scan directories recursively |
 | `-nc` | Disable color output (also honors `NO_COLOR` env var) |
 | `-od <dir>` | Output directory for extracted cover art |
@@ -149,6 +174,42 @@ When supplying `-t titles.txt`, each line can be:
 Track numbers and titles are auto-extracted. Titles without a number prefix are used as-is.
 Lines are matched **in file-system sort order** against the MP3 files.
 
+---
+
+## 🎛️ Presets
+
+Run `go-tagger -SA` to see the full interactive table. Two preset groups are available:
+
+### licface (IDs 0–3)
+Contact: `licface@yahoo.com` · Publisher: `LICFACE` · Encoded By: `BLACKID`
+
+### cumulus13 (IDs 10–13)
+Contact: `cumulus13@gmail.com` · Publisher: `cumulus13` · Encoded By: `cumulus13`
+
+Both groups share the same field logic — only the contact values differ:
+
+| Tag | 0 / 10 | 1 / 11 | 2 / 12 | 3 / 13 |
+|---|---|---|---|---|
+| ARTIST | AUTO | AUTO | AUTO | AUTO |
+| ALBUM_ARTIST | — | — | = ARTIST | = ARTIST |
+| COMMENT | ✅ | ✅ | ✅ | ✅ |
+| COMPOSER | — | — | = ARTIST | = ARTIST |
+| COPYRIGHT | ✅ | ✅ | ✅ | ✅ |
+| DATE | ✅ | ✅ | ✅ | — |
+| DISC | AUTO | AUTO | AUTO | AUTO |
+| ENCODEDBY | ✅ | ✅ | ✅ | ✅ |
+| ORIGINAL_ARTIST | = ARTIST | — | = ARTIST | = ARTIST |
+| GROUP | = ARTIST | — | = ARTIST | = ARTIST |
+| PUBLISHER | — | ✅ | ✅ | ✅ |
+| URL | — | — | ✅ | ✅ |
+| ISRC | — | — | — | CLEAR |
+
+> **AUTO** = derived from existing artist tag. **CLEAR** = field is deleted.
+
+```bash
+go-tagger ./album/ -A 2    # licface full preset
+go-tagger ./album/ -A 12   # cumulus13 full preset
+```
 ---
 
 ## 🎨 Color & Emoji Output
