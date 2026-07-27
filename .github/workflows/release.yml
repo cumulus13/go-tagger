@@ -223,26 +223,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-          # cache disabled — zero external deps, go.sum is empty
-          cache: false
-
-      - name: Ensure go.sum exists
-        run: |
-          # Zero-dep module: go.sum may be absent or empty. setup-go cache
-          # requires it to exist even when empty.
-          [ -f go.sum ] || touch go.sum
-
-      - name: Locate entry point
-        run: |
-          if [ -f cmd/go-tagger/main.go ]; then
-            echo "MAIN_PKG=./cmd/go-tagger" >> $GITHUB_ENV
-          elif [ -f main.go ]; then
-            echo "MAIN_PKG=."               >> $GITHUB_ENV
-          else
-            echo "ERROR: main.go not found in ./cmd/go-tagger/ or ./"
-            find . -name "main.go" | head -10
-            exit 1
-          fi
+          cache: true
 
       - name: Extract version metadata
         id: meta
@@ -257,19 +238,16 @@ jobs:
         env:
           GOOS:        ${{ matrix.goos }}
           GOARCH:      ${{ matrix.goarch }}
+          GOARM:       ${{ matrix.goarm }}
           CGO_ENABLED: "0"
         run: |
-          # Export GOARM only when non-empty; an empty GOARM env var can confuse
-          # some Go versions and produces wrong output for non-ARM targets.
-          GOARM_VAL="${{ matrix.goarm }}"
-          [ -n "$GOARM_VAL" ] && export GOARM="$GOARM_VAL"
-
           VERSION="${{ steps.meta.outputs.VERSION }}"
           COMMIT="${{ steps.meta.outputs.COMMIT }}"
           DATE="${{ steps.meta.outputs.DATE }}"
-          BINARY="go-tagger_${VERSION}_${{ matrix.suffix }}${{ matrix.ext }}"
+          SUFFIX="${{ matrix.suffix }}"
+          EXT="${{ matrix.ext }}"
 
-          echo "GOOS=${GOOS}  GOARCH=${GOARCH}  GOARM=${GOARM_VAL:-n/a}  →  ${BINARY}"
+          BINARY="go-tagger_${VERSION}_${SUFFIX}${EXT}"
 
           go build -trimpath \
             -ldflags "-s -w \
@@ -277,23 +255,20 @@ jobs:
               -X github.com/cumulus13/go-tagger/internal/config.GitCommit=${COMMIT} \
               -X github.com/cumulus13/go-tagger/internal/config.BuildDate=${DATE}" \
             -o "${BINARY}" \
-            ${MAIN_PKG}
-
-          # Print binary info to confirm correct arch
-          ls -lh "${BINARY}"
-          file "${BINARY}" || true
+            ./cmd/go-tagger
 
           echo "BINARY=${BINARY}" >> $GITHUB_ENV
+          ls -lh "${BINARY}"
 
       - name: Package — tar.gz (non-Windows)
         if: matrix.goos != 'windows'
         shell: bash
         run: |
           ARCHIVE="${BINARY%.}.tar.gz"
-          tar czf "${ARCHIVE}" "${BINARY}" README.md LICENSE install.sh
+          tar czf "${ARCHIVE}" "${BINARY}" README.md LICENSE
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
-          ls -lh "${ARCHIVE}"
+          echo "CHECKSUM_FILE=${ARCHIVE}.sha256" >> $GITHUB_ENV
 
       - name: Package — zip (Windows)
         if: matrix.goos == 'windows'
@@ -303,19 +278,20 @@ jobs:
           zip "${ARCHIVE}" "${BINARY}" README.md LICENSE
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
-          ls -lh "${ARCHIVE}"
+          echo "CHECKSUM_FILE=${ARCHIVE}.sha256" >> $GITHUB_ENV
 
-      - name: Upload artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.suffix }}
           path: |
             ${{ env.ARCHIVE }}
-            ${{ env.ARCHIVE }}.sha256
+            ${{ env.CHECKSUM_FILE }}
           if-no-files-found: error
           retention-days: 1
 
-  # ── Publish ───────────────────────────────────────────────────────────────────
+  # ── Release job ───────────────────────────────────────────────────────────────
+
   release:
     name: Publish GitHub Release
     needs: build
@@ -327,13 +303,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all artifacts
+      - name: Download all platform artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
-      - name: Generate SHA256SUMS
+      - name: Generate combined SHA256SUMS
         run: |
           cd dist
           # Merge all per-archive .sha256 files into one canonical file
@@ -346,45 +322,45 @@ jobs:
           echo "=== SHA256SUMS ==="
           cat SHA256SUMS
 
-      - name: Build release notes
+      - name: Extract release notes from CHANGELOG
+        id: notes
         run: |
           TAG="${GITHUB_REF_NAME}"
-          NOTES="release_notes.md"
+          NOTES_FILE="release_notes.md"
 
           # Try CHANGELOG.md first
           if [ -f CHANGELOG.md ]; then
             awk "/^## \[?${TAG#v}\]?/{found=1; next} found && /^## /{exit} found{print}" \
-              CHANGELOG.md > "${NOTES}"
+              CHANGELOG.md > "${NOTES_FILE}"
           fi
 
-          if [ ! -s "${NOTES}" ]; then
-            PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null \
-                   || git rev-list --max-parents=0 HEAD)
+          # Fallback: auto-generate from git log since previous tag
+          if [ ! -s "${NOTES_FILE}" ]; then
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null \
+                       || git rev-list --max-parents=0 HEAD)
             {
               echo "## What's Changed"
               echo ""
-              git log "${PREV}..HEAD" --pretty=format:"- %s (%h)" 2>/dev/null \
+              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" 2>/dev/null \
                 || echo "- Initial release"
               echo ""
               echo ""
-              echo "---"
-              echo ""
-              echo "### Quick Install"
-              echo ""
-              echo "\`\`\`bash"
-              echo "# Any platform — detects OS/arch and install path automatically"
-              echo "curl -fsSL https://github.com/cumulus13/go-tagger/releases/download/${TAG}/install.sh | sh"
-              echo "\`\`\`"
-              echo ""
-              echo "> **Android users:** the install script automatically copies the binary"
-              echo "> to Termux \`\$PREFIX/bin\` or \`/data/local/tmp\` — never to \`/storage/\`"
-              echo "> which is mounted \`noexec\` and cannot run executables."
-              echo ""
-              echo "**Full Changelog:** https://github.com/cumulus13/go-tagger/compare/${PREV}...${TAG}"
-            } > "${NOTES}"
+              echo "**Full Changelog:** \
+          https://github.com/cumulus13/go-tagger/compare/${PREV_TAG}...${TAG}"
+            } > "${NOTES_FILE}"
           fi
 
-          cat "${NOTES}"
+          echo "=== Release notes preview ==="
+          cat "${NOTES_FILE}"
+
+      - name: Compute artifact counts
+        id: counts
+        run: |
+          TARBALLS=$(ls dist/*.tar.gz 2>/dev/null | wc -l)
+          ZIPS=$(ls dist/*.zip 2>/dev/null | wc -l)
+          echo "tarballs=${TARBALLS}" >> $GITHUB_OUTPUT
+          echo "zips=${ZIPS}"        >> $GITHUB_OUTPUT
+          echo "total=$((TARBALLS + ZIPS))" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -399,10 +375,10 @@ jobs:
               contains(github.ref_name, '-rc')
             }}
           files: |
-            install.sh
             dist/*.tar.gz
             dist/*.zip
             dist/SHA256SUMS
           fail_on_unmatched_files: false
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
