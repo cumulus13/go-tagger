@@ -46,22 +46,57 @@ sudo mv go-tagger /usr/local/bin/
 
 ### Android / Kali NetHunter / Termux
 
+> ⚠️ **Critical:** `/storage/`, `/sdcard/`, and `/Download/` are mounted `noexec` on Android.
+> Binaries placed there **always** fail with `permission denied` regardless of `chmod +x`.
+> You **must** install to an executable path first.
+
 The binary is statically linked — no libc or shared libraries needed.
 
-```bash
-# armv7 (32-bit — Kali NetHunter, most Android devices)
-curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_android_armv7.tar.gz | tar xz
-chmod +x go-tagger-android-armv7
-# Optional: move to Termux $PATH
-mv go-tagger-android-armv7 $PREFIX/bin/go-tagger
+#### Option A — Termux (recommended)
 
-# arm64 (64-bit — modern Android with Termux)
-curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_android_arm64.tar.gz | tar xz
-chmod +x go-tagger-android-arm64
-mv go-tagger-android-arm64 $PREFIX/bin/go-tagger
+```bash
+# Inside Termux — $PREFIX/bin is always executable
+cd ~
+
+# arm64 (modern Android, aarch64)
+curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_v1.0.3_android_arm64.tar.gz | tar xz
+chmod +x go-tagger_v1.0.3_android_arm64
+mv go-tagger_v1.0.3_android_arm64 $PREFIX/bin/go-tagger
+
+# armv7 (32-bit / Kali NetHunter)
+curl -L https://github.com/cumulus13/go-tagger/releases/latest/download/go-tagger_v1.0.3_android_armv7.tar.gz | tar xz
+chmod +x go-tagger_v1.0.3_android_armv7
+mv go-tagger_v1.0.3_android_armv7 $PREFIX/bin/go-tagger
 ```
 
+#### Option B — `/data/local/tmp` (no root, no Termux)
+
+```bash
+# Copy from Download to an executable location first
+cp /storage/self/primary/Download/go-tagger_v1.0.3_android_arm64 /data/local/tmp/
+chmod +x /data/local/tmp/go-tagger_v1.0.3_android_arm64
+
+# Run from there, or add an alias
+alias go-tagger=/data/local/tmp/go-tagger_v1.0.3_android_arm64
+```
+
+#### Option C — `adb` from a PC
+
+```bash
+adb push go-tagger_v1.0.3_android_arm64 /data/local/tmp/go-tagger
+adb shell chmod +x /data/local/tmp/go-tagger
+adb shell /data/local/tmp/go-tagger -v
+```
+
+> Verified on: `Linux localhost 5.10.136-android12 aarch64 Android`
 > Verified on: `Linux localhost 3.18.100-Kali-Nethunter-Kernel armv7l Android`
+
+#### Why `/storage/Download` always fails
+
+Android mounts shared storage (`/storage/`, `/sdcard/`) with the `noexec` flag — the kernel
+refuses to execute any file from that partition regardless of file permissions. This is an
+Android security policy, not a go-tagger issue. The fix is always to copy the binary to
+`~/` (Termux home), `$PREFIX/bin/`, or `/data/local/tmp/` before running.
 
 ### Build from source
 
