@@ -8,33 +8,16 @@ on:
 permissions:
   contents: write
 
-# ── Matrix ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+#  Platform matrix
 #
-#  Platform notes
-#  ──────────────
-#  android/armv7   → GOOS=linux GOARCH=arm GOARM=7  (Kali NetHunter, Termux)
-#  android/arm64   → GOOS=linux GOARCH=arm64         (modern Android via Termux)
-#  linux/armv6     → GOOS=linux GOARCH=arm GOARM=6  (Raspberry Pi 1 / Zero)
-#  linux/armv7     → GOOS=linux GOARCH=arm GOARM=7  (Raspberry Pi 2/3, most SBCs)
-#  linux/arm64     → GOOS=linux GOARCH=arm64         (Pi 4/5, M-series via Rosetta)
-#  linux/386       → GOOS=linux GOARCH=386           (32-bit x86)
-#  linux/amd64     → GOOS=linux GOARCH=amd64
-#  linux/mips      → GOOS=linux GOARCH=mips          (OpenWRT big-endian MIPS)
-#  linux/mipsle    → GOOS=linux GOARCH=mipsle        (OpenWRT little-endian MIPS)
-#  linux/mips64    → GOOS=linux GOARCH=mips64
-#  linux/mips64le  → GOOS=linux GOARCH=mips64le
-#  linux/ppc64le   → GOOS=linux GOARCH=ppc64le       (IBM POWER, Talos workstations)
-#  linux/riscv64   → GOOS=linux GOARCH=riscv64       (StarFive VisionFive, etc.)
-#  linux/s390x     → GOOS=linux GOARCH=s390x         (IBM Z)
-#  darwin/amd64    → macOS Intel
-#  darwin/arm64    → macOS Apple Silicon (M1/M2/M3/M4)
-#  windows/386     → 32-bit Windows
-#  windows/amd64   → 64-bit Windows
-#  windows/arm64   → Windows on ARM (Surface Pro X, Snapdragon laptops)
-#  freebsd/amd64   → FreeBSD x86-64
-#  freebsd/arm64   → FreeBSD ARM64
-#  netbsd/amd64    → NetBSD x86-64
-#  openbsd/amd64   → OpenBSD x86-64
+#  android_armv7  → GOOS=linux GOARCH=arm  GOARM=7  Kali NetHunter / Termux 32-bit
+#  android_arm64  → GOOS=linux GOARCH=arm64          Termux 64-bit / modern Android
+#
+#  ⚠  Android binaries must be run from an executable filesystem:
+#     Termux $PREFIX/bin, /data/local/tmp, or ~/  — NOT /storage/ or /sdcard/
+#     Use install.sh which handles this automatically.
+# ─────────────────────────────────────────────────────────────────────────────
 
 jobs:
   build:
@@ -45,173 +28,43 @@ jobs:
       matrix:
         include:
           # ── Linux x86 ─────────────────────────────────────────────────────
-          - label:   "linux/amd64"
-            goos:    linux
-            goarch:  amd64
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_amd64"
-
-          - label:   "linux/386"
-            goos:    linux
-            goarch:  "386"
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_386"
+          - { label: "linux/amd64",                          goos: linux,   goarch: amd64,    goarm: "",  ext: "",     suffix: linux_amd64    }
+          - { label: "linux/386",                            goos: linux,   goarch: "386",    goarm: "",  ext: "",     suffix: linux_386      }
 
           # ── Linux ARM ─────────────────────────────────────────────────────
-          - label:   "linux/armv6 (RPi 1/Zero)"
-            goos:    linux
-            goarch:  arm
-            goarm:   "6"
-            ext:     ""
-            suffix:  "linux_armv6"
+          - { label: "linux/armv6 (RPi 1/Zero)",             goos: linux,   goarch: arm,      goarm: "6", ext: "",     suffix: linux_armv6    }
+          - { label: "linux/armv7 (RPi 2/3, SBCs)",          goos: linux,   goarch: arm,      goarm: "7", ext: "",     suffix: linux_armv7    }
+          - { label: "linux/arm64",                          goos: linux,   goarch: arm64,    goarm: "",  ext: "",     suffix: linux_arm64    }
 
-          - label:   "linux/armv7 (RPi 2/3, SBCs)"
-            goos:    linux
-            goarch:  arm
-            goarm:   "7"
-            ext:     ""
-            suffix:  "linux_armv7"
+          # ── Android (noexec note — see install.sh) ────────────────────────
+          - { label: "android/armv7 (Kali NetHunter / Termux 32-bit)", goos: linux, goarch: arm,   goarm: "7", ext: "", suffix: android_armv7 }
+          - { label: "android/arm64 (Termux 64-bit / aarch64)",         goos: linux, goarch: arm64, goarm: "",  ext: "", suffix: android_arm64 }
 
-          - label:   "linux/arm64"
-            goos:    linux
-            goarch:  arm64
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_arm64"
+          # ── Linux MIPS ────────────────────────────────────────────────────
+          - { label: "linux/mips (OpenWRT big-endian)",      goos: linux,   goarch: mips,     goarm: "",  ext: "",     suffix: linux_mips     }
+          - { label: "linux/mipsle (OpenWRT little-endian)", goos: linux,   goarch: mipsle,   goarm: "",  ext: "",     suffix: linux_mipsle   }
+          - { label: "linux/mips64",                         goos: linux,   goarch: mips64,   goarm: "",  ext: "",     suffix: linux_mips64   }
+          - { label: "linux/mips64le",                       goos: linux,   goarch: mips64le, goarm: "",  ext: "",     suffix: linux_mips64le }
 
-          # ── Android (via Linux ARM — runs on Termux / Kali NetHunter) ─────
-          - label:   "android/armv7 (Kali NetHunter, Termux 32-bit)"
-            goos:    linux
-            goarch:  arm
-            goarm:   "7"
-            ext:     ""
-            suffix:  "android_armv7"
-
-          - label:   "android/arm64 (Termux 64-bit)"
-            goos:    linux
-            goarch:  arm64
-            goarm:   ""
-            ext:     ""
-            suffix:  "android_arm64"
-
-          # ── Linux MIPS (routers / embedded) ───────────────────────────────
-          - label:   "linux/mips (OpenWRT big-endian)"
-            goos:    linux
-            goarch:  mips
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_mips"
-
-          - label:   "linux/mipsle (OpenWRT little-endian)"
-            goos:    linux
-            goarch:  mipsle
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_mipsle"
-
-          - label:   "linux/mips64"
-            goos:    linux
-            goarch:  mips64
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_mips64"
-
-          - label:   "linux/mips64le"
-            goos:    linux
-            goarch:  mips64le
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_mips64le"
-
-          # ── Linux other architectures ─────────────────────────────────────
-          - label:   "linux/ppc64le (IBM POWER)"
-            goos:    linux
-            goarch:  ppc64le
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_ppc64le"
-
-          - label:   "linux/riscv64 (StarFive, etc.)"
-            goos:    linux
-            goarch:  riscv64
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_riscv64"
-
-          - label:   "linux/s390x (IBM Z)"
-            goos:    linux
-            goarch:  s390x
-            goarm:   ""
-            ext:     ""
-            suffix:  "linux_s390x"
+          # ── Linux other ───────────────────────────────────────────────────
+          - { label: "linux/ppc64le (IBM POWER)",            goos: linux,   goarch: ppc64le,  goarm: "",  ext: "",     suffix: linux_ppc64le  }
+          - { label: "linux/riscv64",                        goos: linux,   goarch: riscv64,  goarm: "",  ext: "",     suffix: linux_riscv64  }
+          - { label: "linux/s390x (IBM Z)",                  goos: linux,   goarch: s390x,    goarm: "",  ext: "",     suffix: linux_s390x    }
 
           # ── macOS ─────────────────────────────────────────────────────────
-          - label:   "darwin/amd64 (macOS Intel)"
-            goos:    darwin
-            goarch:  amd64
-            goarm:   ""
-            ext:     ""
-            suffix:  "darwin_amd64"
-
-          - label:   "darwin/arm64 (macOS Apple Silicon)"
-            goos:    darwin
-            goarch:  arm64
-            goarm:   ""
-            ext:     ""
-            suffix:  "darwin_arm64"
+          - { label: "darwin/amd64 (macOS Intel)",           goos: darwin,  goarch: amd64,    goarm: "",  ext: "",     suffix: darwin_amd64   }
+          - { label: "darwin/arm64 (macOS Apple Silicon)",   goos: darwin,  goarch: arm64,    goarm: "",  ext: "",     suffix: darwin_arm64   }
 
           # ── Windows ───────────────────────────────────────────────────────
-          - label:   "windows/386 (32-bit)"
-            goos:    windows
-            goarch:  "386"
-            goarm:   ""
-            ext:     ".exe"
-            suffix:  "windows_386"
+          - { label: "windows/386 (32-bit)",                 goos: windows, goarch: "386",    goarm: "",  ext: ".exe", suffix: windows_386    }
+          - { label: "windows/amd64 (64-bit)",               goos: windows, goarch: amd64,    goarm: "",  ext: ".exe", suffix: windows_amd64  }
+          - { label: "windows/arm64 (Snapdragon/Surface)",   goos: windows, goarch: arm64,    goarm: "",  ext: ".exe", suffix: windows_arm64  }
 
-          - label:   "windows/amd64 (64-bit)"
-            goos:    windows
-            goarch:  amd64
-            goarm:   ""
-            ext:     ".exe"
-            suffix:  "windows_amd64"
-
-          - label:   "windows/arm64 (Snapdragon / Surface)"
-            goos:    windows
-            goarch:  arm64
-            goarm:   ""
-            ext:     ".exe"
-            suffix:  "windows_arm64"
-
-          # ── BSD family ────────────────────────────────────────────────────
-          - label:   "freebsd/amd64"
-            goos:    freebsd
-            goarch:  amd64
-            goarm:   ""
-            ext:     ""
-            suffix:  "freebsd_amd64"
-
-          - label:   "freebsd/arm64"
-            goos:    freebsd
-            goarch:  arm64
-            goarm:   ""
-            ext:     ""
-            suffix:  "freebsd_arm64"
-
-          - label:   "netbsd/amd64"
-            goos:    netbsd
-            goarch:  amd64
-            goarm:   ""
-            ext:     ""
-            suffix:  "netbsd_amd64"
-
-          - label:   "openbsd/amd64"
-            goos:    openbsd
-            goarch:  amd64
-            goarm:   ""
-            ext:     ""
-            suffix:  "openbsd_amd64"
+          # ── BSD ───────────────────────────────────────────────────────────
+          - { label: "freebsd/amd64",  goos: freebsd, goarch: amd64, goarm: "", ext: "", suffix: freebsd_amd64 }
+          - { label: "freebsd/arm64",  goos: freebsd, goarch: arm64, goarm: "", ext: "", suffix: freebsd_arm64 }
+          - { label: "netbsd/amd64",   goos: netbsd,  goarch: amd64, goarm: "", ext: "", suffix: netbsd_amd64  }
+          - { label: "openbsd/amd64",  goos: openbsd, goarch: amd64, goarm: "", ext: "", suffix: openbsd_amd64 }
 
     steps:
       - name: Checkout
@@ -223,31 +76,51 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-          cache: true
+          # cache disabled — zero external deps, go.sum is empty
+          cache: false
+
+      - name: Ensure go.sum exists
+        run: |
+          # Zero-dep module: go.sum may be absent or empty. setup-go cache
+          # requires it to exist even when empty.
+          [ -f go.sum ] || touch go.sum
+
+      - name: Locate entry point
+        run: |
+          if [ -f cmd/go-tagger/main.go ]; then
+            echo "MAIN_PKG=./cmd/go-tagger" >> $GITHUB_ENV
+          elif [ -f main.go ]; then
+            echo "MAIN_PKG=."               >> $GITHUB_ENV
+          else
+            echo "ERROR: main.go not found in ./cmd/go-tagger/ or ./"
+            find . -name "main.go" | head -10
+            exit 1
+          fi
 
       - name: Extract version metadata
         id: meta
-        shell: bash
         run: |
-          echo "VERSION=${GITHUB_REF_NAME}"                      >> $GITHUB_OUTPUT
-          echo "COMMIT=$(git rev-parse --short HEAD)"            >> $GITHUB_OUTPUT
-          echo "DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"            >> $GITHUB_OUTPUT
+          echo "VERSION=${GITHUB_REF_NAME}"                  >> $GITHUB_OUTPUT
+          echo "COMMIT=$(git rev-parse --short HEAD)"        >> $GITHUB_OUTPUT
+          echo "DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"        >> $GITHUB_OUTPUT
 
-      - name: Build binary
-        shell: bash
+      - name: Build
         env:
           GOOS:        ${{ matrix.goos }}
           GOARCH:      ${{ matrix.goarch }}
-          GOARM:       ${{ matrix.goarm }}
           CGO_ENABLED: "0"
         run: |
+          # Export GOARM only when non-empty; an empty GOARM env var can confuse
+          # some Go versions and produces wrong output for non-ARM targets.
+          GOARM_VAL="${{ matrix.goarm }}"
+          [ -n "$GOARM_VAL" ] && export GOARM="$GOARM_VAL"
+
           VERSION="${{ steps.meta.outputs.VERSION }}"
           COMMIT="${{ steps.meta.outputs.COMMIT }}"
           DATE="${{ steps.meta.outputs.DATE }}"
-          SUFFIX="${{ matrix.suffix }}"
-          EXT="${{ matrix.ext }}"
+          BINARY="go-tagger_${VERSION}_${{ matrix.suffix }}${{ matrix.ext }}"
 
-          BINARY="go-tagger_${VERSION}_${SUFFIX}${EXT}"
+          echo "GOOS=${GOOS}  GOARCH=${GOARCH}  GOARM=${GOARM_VAL:-n/a}  →  ${BINARY}"
 
           go build -trimpath \
             -ldflags "-s -w \
@@ -255,43 +128,43 @@ jobs:
               -X github.com/cumulus13/go-tagger/internal/config.GitCommit=${COMMIT} \
               -X github.com/cumulus13/go-tagger/internal/config.BuildDate=${DATE}" \
             -o "${BINARY}" \
-            ./cmd/go-tagger
+            ${MAIN_PKG}
+
+          # Print binary info to confirm correct arch
+          ls -lh "${BINARY}"
+          file "${BINARY}" || true
 
           echo "BINARY=${BINARY}" >> $GITHUB_ENV
-          ls -lh "${BINARY}"
 
       - name: Package — tar.gz (non-Windows)
         if: matrix.goos != 'windows'
-        shell: bash
         run: |
           ARCHIVE="${BINARY%.}.tar.gz"
-          tar czf "${ARCHIVE}" "${BINARY}" README.md LICENSE
+          tar czf "${ARCHIVE}" "${BINARY}" README.md LICENSE install.sh
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
-          echo "CHECKSUM_FILE=${ARCHIVE}.sha256" >> $GITHUB_ENV
+          ls -lh "${ARCHIVE}"
 
       - name: Package — zip (Windows)
         if: matrix.goos == 'windows'
-        shell: bash
         run: |
           ARCHIVE="${BINARY%.exe}.zip"
           zip "${ARCHIVE}" "${BINARY}" README.md LICENSE
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
-          echo "CHECKSUM_FILE=${ARCHIVE}.sha256" >> $GITHUB_ENV
+          ls -lh "${ARCHIVE}"
 
-      - name: Upload build artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.suffix }}
           path: |
             ${{ env.ARCHIVE }}
-            ${{ env.CHECKSUM_FILE }}
+            ${{ env.ARCHIVE }}.sha256
           if-no-files-found: error
           retention-days: 1
 
-  # ── Release job ───────────────────────────────────────────────────────────────
-
+  # ── Publish ───────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
     needs: build
@@ -303,64 +176,61 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download all platform artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
-      - name: Generate combined SHA256SUMS
+      - name: Generate SHA256SUMS
         run: |
           cd dist
-          # Merge all per-archive .sha256 files into one canonical file
           cat *.sha256 | sort > SHA256SUMS
           rm -f *.sha256
-          echo ""
           echo "=== Release artifacts ==="
           ls -lh
           echo ""
           echo "=== SHA256SUMS ==="
           cat SHA256SUMS
 
-      - name: Extract release notes from CHANGELOG
-        id: notes
+      - name: Build release notes
         run: |
           TAG="${GITHUB_REF_NAME}"
-          NOTES_FILE="release_notes.md"
+          NOTES="release_notes.md"
 
-          # Try CHANGELOG.md first
           if [ -f CHANGELOG.md ]; then
             awk "/^## \[?${TAG#v}\]?/{found=1; next} found && /^## /{exit} found{print}" \
-              CHANGELOG.md > "${NOTES_FILE}"
+              CHANGELOG.md > "${NOTES}"
           fi
 
-          # Fallback: auto-generate from git log since previous tag
-          if [ ! -s "${NOTES_FILE}" ]; then
-            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null \
-                       || git rev-list --max-parents=0 HEAD)
+          if [ ! -s "${NOTES}" ]; then
+            PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null \
+                   || git rev-list --max-parents=0 HEAD)
             {
               echo "## What's Changed"
               echo ""
-              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" 2>/dev/null \
+              git log "${PREV}..HEAD" --pretty=format:"- %s (%h)" 2>/dev/null \
                 || echo "- Initial release"
               echo ""
               echo ""
-              echo "**Full Changelog:** \
-          https://github.com/cumulus13/go-tagger/compare/${PREV_TAG}...${TAG}"
-            } > "${NOTES_FILE}"
+              echo "---"
+              echo ""
+              echo "### Quick Install"
+              echo ""
+              echo "\`\`\`bash"
+              echo "# Any platform — detects OS/arch and install path automatically"
+              echo "curl -fsSL https://github.com/cumulus13/go-tagger/releases/download/${TAG}/install.sh | sh"
+              echo "\`\`\`"
+              echo ""
+              echo "> **Android users:** the install script automatically copies the binary"
+              echo "> to Termux \`\$PREFIX/bin\` or \`/data/local/tmp\` — never to \`/storage/\`"
+              echo "> which is mounted \`noexec\` and cannot run executables."
+              echo ""
+              echo "**Full Changelog:** https://github.com/cumulus13/go-tagger/compare/${PREV}...${TAG}"
+            } > "${NOTES}"
           fi
 
-          echo "=== Release notes preview ==="
-          cat "${NOTES_FILE}"
-
-      - name: Compute artifact counts
-        id: counts
-        run: |
-          TARBALLS=$(ls dist/*.tar.gz 2>/dev/null | wc -l)
-          ZIPS=$(ls dist/*.zip 2>/dev/null | wc -l)
-          echo "tarballs=${TARBALLS}" >> $GITHUB_OUTPUT
-          echo "zips=${ZIPS}"        >> $GITHUB_OUTPUT
-          echo "total=$((TARBALLS + ZIPS))" >> $GITHUB_OUTPUT
+          cat "${NOTES}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -375,10 +245,10 @@ jobs:
               contains(github.ref_name, '-rc')
             }}
           files: |
+            install.sh
             dist/*.tar.gz
             dist/*.zip
             dist/SHA256SUMS
           fail_on_unmatched_files: false
-          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
